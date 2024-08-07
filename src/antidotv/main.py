@@ -11,6 +11,14 @@ def _read_file(fpath: str) -> str:
     with open(fpath, encoding="utf8") as f:
         return f.read()
 
+
+def _is_verilog(fpath: str) -> bool:
+    """Determine if input file is a Verilog or SystemVerilog file."""
+
+    _extensions: List[str] = [".v", ".verilog", ".vlg", ".vh", ".sv", ".svh"]
+    return any([fpath.endswith(ext) for ext in _extensions])
+
+
 @dataclass
 class Module:
     name: str
@@ -36,7 +44,7 @@ def find_sv_wildcards(root_folder: str) -> List[str]:
     """Find Verilog and SystemVerilog files with wildcards instantiations."""
 
     if os.path.isfile(root_folder):
-        if root_folder.endswith(".sv"):
+        if _is_verilog(root_folder):
             file_content: str = _read_file(root_folder)
             if ".*" in file_content:
                 return [root_folder]
@@ -46,7 +54,7 @@ def find_sv_wildcards(root_folder: str) -> List[str]:
     # Walk through the root folder and its subdirectories
     for subdir, _, files in os.walk(root_folder):
         for file in files:
-            if file.endswith(".sv"):
+            if _is_verilog(file):
                 file_path: str = os.path.join(subdir, file)
                 file_content: str = _read_file(file_path)
                 if ".*" in file_content:
@@ -68,7 +76,7 @@ def find_sv_modules(root_folder: str) -> Dict[str, List[Module]]:
     # Walk through the root folder and its subdirectories
     for subdir, _, files in os.walk(root_folder):
         for file in files:
-            if file.endswith(".sv"):
+            if _is_verilog(file):
                 file_path: str = os.path.join(subdir, file)
                 file_content: str = _read_file(file_path)
                 file_modules: List[Module] = []
