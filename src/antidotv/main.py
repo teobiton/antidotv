@@ -24,13 +24,32 @@ class Module:
     name: str
     inouts: List[str]
 
-    def instantiate(self, instance: str) -> str:
-        format: str = ""
+    def instantiate(self, instance: str, order: bool) -> str:
+        """Rework the instantiation of the module"""
+
+        format: List[str] = []
         tabs: str = self._resolve_tabs(instance) * " "
+
         for inout in self.inouts:
             if not re.findall(rf"\.\b({inout})\b *?.*?,", instance):
-                format += f"{tabs}.{inout},\n"
-        return format.strip(",\n").strip()
+                format.append(f"{tabs}.{inout},")
+
+        if order:
+            cured_instance: str = instance.replace(".*", "\n".join(format).strip())
+            lines: List[str] = cured_instance.splitlines()
+
+            ios_instantiation: Dict[str, str] = self._resolve_ios(lines)
+
+            io: int = 0
+
+            for nl, line in enumerate(lines):
+                if any([line.strip().startswith(f".{inout}") for inout in self.inouts]):
+                    lines[nl] = ios_instantiation[self.inouts[io]]
+                    io += 1
+
+            return "\n".join(lines).strip(",\n")
+
+        return instance.replace(".*", "\n".join(format).strip(",\n").strip())
 
     @staticmethod
     def _resolve_tabs(instance: str) -> int:
@@ -38,6 +57,20 @@ class Module:
         if match:
             return len(match.group(1))
         return 0
+
+    def _resolve_ios(self, lines: List[str]) -> Dict[str, str]:
+        """Match I/O to how they're instantiated."""
+
+        ios_instantiation: Dict[str, str] = {}
+
+        for line in lines:
+            for inout in self.inouts:
+                match = re.match(rf"\.\b({inout})\b *?.*?,", line.strip())
+                if match:
+                    ios_instantiation[inout] = line
+                    break
+
+        return ios_instantiation
 
 
 def find_sv_wildcards(root_folder: str) -> List[str]:
@@ -56,7 +89,7 @@ def find_sv_wildcards(root_folder: str) -> List[str]:
         for file in files:
             if _is_verilog(file):
                 file_path: str = os.path.join(subdir, file)
-                file_content: str = _read_file(file_path)
+                file_content = _read_file(file_path)
                 if ".*" in file_content:
                     wildcards.append(file_path)
 
@@ -104,29 +137,41 @@ def _parse_inouts(module_content: str) -> List[str]:
     return inouts
 
 
-def replace_wildcards_with_signals(file_content: str, module: Module) -> str:
+def replace_wildcards_with_signals(
+    file_content: str, module: Module, order: bool
+) -> str:
     """Replace wildcard instantiations with missing signals from called module."""
 
     cured_file_content: str = file_content
+
+    readjust: int = 0
 
     for match in re.finditer(
         rf"(?s)^ +\b({module.name})\s*#?\(.*?\)\;", cured_file_content, re.MULTILINE
     ):
         print(f"[INFO]: {module.name} instantiated.")
+        init: int = len(cured_file_content)
         start, end = match.span()
+
+        start += readjust
+        end += readjust
+
         instance: str = cured_file_content[start:end]
         if ".*" in instance:
-            replacement: str = module.instantiate(instance)
-            new_instance: str = instance.replace(".*", replacement)
-            print(f"[INFO]: Removed wildcard instantiation of {module.name}.")
             cured_file_content = (
-                cured_file_content[:start] + new_instance + cured_file_content[end:]
+                cured_file_content[:start]
+                + module.instantiate(instance, order)
+                + cured_file_content[end:]
             )
+            print(f"[INFO]: Removed wildcard instantiation of {module.name}.")
+        readjust = len(cured_file_content) - init
 
     return cured_file_content
 
 
-def cure_from_wildcards(file_path: str, sv_modules: Dict[str, List[Module]]) -> None:
+def cure_from_wildcards(
+    file_path: str, sv_modules: Dict[str, List[Module]], order: bool
+) -> None:
     """Remove all wildcard instantiations from a file based on found modules."""
 
     print(f"[INFO]: Trying to cure {file_path}.")
@@ -135,11 +180,12 @@ def cure_from_wildcards(file_path: str, sv_modules: Dict[str, List[Module]]) -> 
 
     for path in sv_modules.keys():
         for module in sv_modules[path]:
-            file_content = replace_wildcards_with_signals(file_content, module)
+            file_content = replace_wildcards_with_signals(file_content, module, order)
 
     # Fix syntax errors if any
-    for match in re.finditer(rf",\n\s+\)\;", file_content, re.MULTILINE):
-        file_content = file_content.replace(match.group(0), "\n  );")
+    for match in re.finditer(r",\n(\s+)\)\;", file_content, re.MULTILINE):
+        _tabs: str = len(match.group(1)) * " "
+        file_content = file_content.replace(match.group(0), f"\n{_tabs});")
 
     # Write the updated content back to the input file
     with open(file_path, "w") as f:
@@ -167,7 +213,7 @@ def main() -> None:
     print(f"[INFO] Found {len(sv_modules)} modules in {search_path}.")
 
     for file in files:
-        cure_from_wildcards(file, sv_modules)
+        cure_from_wildcards(file, sv_modules, args.order)
 
     sys.exit(0)
 
