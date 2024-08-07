@@ -1,0 +1,14 @@
+# Packaging
+*.egg
+*.egg-info
+__pycache__
+*.eggs
+build
+
+# Pytest
+.pytest_cache
+
+# Mypy
+.mypy*
+
+
