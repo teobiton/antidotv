@@ -6,6 +6,7 @@ from typing import Dict, List
 
 from antidotv.args import build_parser
 
+
 def _read_file(fpath: str) -> str:
     with open(fpath, encoding="utf8") as f:
         return f.read()
@@ -16,12 +17,12 @@ class Module:
     inouts: List[str]
 
     def instantiate(self, instance: str) -> str:
-        _format: str = ""
-        _tabs: str = self._resolve_tabs(instance) * " "
+        format: str = ""
+        tabs: str = self._resolve_tabs(instance) * " "
         for inout in self.inouts:
             if not re.findall(rf"\.\b({inout})\b *?.*?,", instance):
-                _format += f"{_tabs}.{inout},\n"
-        return _format.strip(",\n").strip()
+                format += f"{tabs}.{inout},\n"
+        return format.strip(",\n").strip()
 
     @staticmethod
     def _resolve_tabs(instance: str) -> int:
@@ -32,6 +33,8 @@ class Module:
 
 
 def find_sv_wildcards(root_folder: str) -> List[str]:
+    """Find Verilog and SystemVerilog files with wildcards instantiations."""
+
     if os.path.isfile(root_folder):
         if root_folder.endswith(".sv"):
             file_content: str = _read_file(root_folder)
@@ -53,6 +56,8 @@ def find_sv_wildcards(root_folder: str) -> List[str]:
 
 
 def find_sv_modules(root_folder: str) -> Dict[str, List[Module]]:
+    """Find all modules definitions in Verilog and SystemVerilog files."""
+
     sv_modules: Dict[str, List[Module]] = {}
 
     # Regular expression to match SystemVerilog module definitions
@@ -72,14 +77,16 @@ def find_sv_modules(root_folder: str) -> Dict[str, List[Module]]:
                         start, end = match.span()
                         module: str = file_content[start:end]
                         file_modules.append(
-                            Module(name=match.group(1), inouts=parse_inouts(module))
+                            Module(name=match.group(1), inouts=_parse_inouts(module))
                         )
             sv_modules[file_path] = file_modules
 
     return sv_modules
 
 
-def parse_inouts(module_content: str) -> List[str]:
+def _parse_inouts(module_content: str) -> List[str]:
+    """Build a list of input and output signals of a Verilog or SystemVerilog module."""
+
     inouts: List[str] = []
     for match in re.finditer(
         r"^ *?\b(input|output|inout).+?(\w+)(\,|\s\)\;)", module_content, re.MULTILINE
@@ -89,7 +96,9 @@ def parse_inouts(module_content: str) -> List[str]:
     return inouts
 
 
-def replace_star_with_signals(file_content: str, module: Module) -> str:
+def replace_wildcards_with_signals(file_content: str, module: Module) -> str:
+    """Replace wildcard instantiations with missing signals from called module."""
+
     cured_file_content: str = file_content
 
     for match in re.finditer(
@@ -110,13 +119,15 @@ def replace_star_with_signals(file_content: str, module: Module) -> str:
 
 
 def cure_from_wildcards(file_path: str, sv_modules: Dict[str, List[Module]]) -> None:
+    """Remove all wildcard instantiations from a file based on found modules."""
+
     print(f"[INFO]: Trying to cure {file_path}.")
 
     file_content: str = _read_file(file_path)
 
     for path in sv_modules.keys():
         for module in sv_modules[path]:
-            file_content = replace_star_with_signals(file_content, module)
+            file_content = replace_wildcards_with_signals(file_content, module)
 
     # Fix syntax errors if any
     for match in re.finditer(rf",\n\s+\)\;", file_content, re.MULTILINE):
