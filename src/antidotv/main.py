@@ -130,9 +130,11 @@ def _parse_inouts(module_content: str) -> List[str]:
 
     inouts: List[str] = []
     for match in re.finditer(
-        r"^ *?\b(input|output|inout).+?(\w+)(\,|\s\)\;)", module_content, re.MULTILINE
+        r"^ *?\b(?:input|output|inout).+?(\w+)(?:\,|\s+?\)\;)",
+        module_content,
+        re.MULTILINE,
     ):
-        _, name, _ = match.groups()
+        name: str = match.group(1)
         inouts.append(name)
     return inouts
 
