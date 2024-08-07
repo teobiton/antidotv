@@ -6,6 +6,9 @@ from typing import Dict, List
 
 from antidotv.args import build_parser
 
+def _read_file(fpath: str) -> str:
+    with open(fpath, encoding="utf8") as f:
+        return f.read()
 
 @dataclass
 class Module:
@@ -31,10 +34,9 @@ class Module:
 def find_sv_wildcards(root_folder: str) -> List[str]:
     if os.path.isfile(root_folder):
         if root_folder.endswith(".sv"):
-            with open(root_folder, "r") as f:
-                file_content: str = f.read()
-                if ".*" in file_content:
-                    return [root_folder]
+            file_content: str = _read_file(root_folder)
+            if ".*" in file_content:
+                return [root_folder]
 
     wildcards: List[str] = []
 
@@ -43,10 +45,9 @@ def find_sv_wildcards(root_folder: str) -> List[str]:
         for file in files:
             if file.endswith(".sv"):
                 file_path: str = os.path.join(subdir, file)
-                with open(file_path, "r") as f:
-                    file_content: str = f.read()
-                    if ".*" in file_content:
-                        wildcards.append(file_path)
+                file_content: str = _read_file(file_path)
+                if ".*" in file_content:
+                    wildcards.append(file_path)
 
     return wildcards
 
@@ -64,16 +65,15 @@ def find_sv_modules(root_folder: str) -> Dict[str, List[Module]]:
         for file in files:
             if file.endswith(".sv"):
                 file_path: str = os.path.join(subdir, file)
-                with open(file_path, "r") as f:
-                    file_content: str = f.read()
-                    file_modules: List[Module] = []
-                    for match in module_regex.finditer(file_content):
-                        if match:
-                            start, end = match.span()
-                            module: str = file_content[start:end]
-                            file_modules.append(
-                                Module(name=match.group(1), inouts=parse_inouts(module))
-                            )
+                file_content: str = _read_file(file_path)
+                file_modules: List[Module] = []
+                for match in module_regex.finditer(file_content):
+                    if match:
+                        start, end = match.span()
+                        module: str = file_content[start:end]
+                        file_modules.append(
+                            Module(name=match.group(1), inouts=parse_inouts(module))
+                        )
             sv_modules[file_path] = file_modules
 
     return sv_modules
@@ -112,8 +112,7 @@ def replace_star_with_signals(file_content: str, module: Module) -> str:
 def cure_from_wildcards(file_path: str, sv_modules: Dict[str, List[Module]]) -> None:
     print(f"[INFO]: Trying to cure {file_path}.")
 
-    with open(file_path, "r") as f:
-        file_content = f.read()
+    file_content: str = _read_file(file_path)
 
     for path in sv_modules.keys():
         for module in sv_modules[path]:
