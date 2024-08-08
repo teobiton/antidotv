@@ -35,19 +35,7 @@ class Module:
                 format.append(f"{tabs}.{inout},")
 
         if order:
-            cured_instance: str = instance.replace(".*", "\n".join(format).strip())
-            lines: List[str] = cured_instance.splitlines()
-
-            ios_instantiation: Dict[str, str] = self._resolve_ios(lines)
-
-            io: int = 0
-
-            for nl, line in enumerate(lines):
-                if any([line.strip().startswith(f".{inout}") for inout in self.inouts]):
-                    lines[nl] = ios_instantiation[self.inouts[io]]
-                    io += 1
-
-            return "\n".join(lines).strip(",\n")
+            return self._ordered_ios(instance, format)
 
         return instance.replace(".*", "\n".join(format).strip(",\n").strip())
 
@@ -58,8 +46,24 @@ class Module:
             return len(match.group(1))
         return 0
 
+    def _ordered_ios(self, instance: str, new_ios: List[str]) -> str:
+        """Order I/Os in new instance."""
+
+        lines: List[str] = instance.replace(
+            ".*", "\n".join(new_ios).strip()
+        ).splitlines()
+        ios_instantiation: Dict[str, str] = self._resolve_ios(lines)
+        io: int = 0
+
+        for nl, line in enumerate(lines):
+            if any([line.strip().startswith(f".{inout}") for inout in self.inouts]):
+                lines[nl] = ios_instantiation[self.inouts[io]]
+                io += 1
+
+        return "\n".join(lines).strip(",\n")
+
     def _resolve_ios(self, lines: List[str]) -> Dict[str, str]:
-        """Match I/O to how they're instantiated."""
+        """Match I/Os to how they're instantiated."""
 
         ios_instantiation: Dict[str, str] = {}
 
