@@ -77,19 +77,18 @@ class Module:
         return ios_instantiation
 
 
-def find_sv_wildcards(root_folder: str) -> List[str]:
+def find_sv_wildcards(root_path: str) -> List[str]:
     """Find Verilog and SystemVerilog files with wildcards instantiations."""
 
-    if os.path.isfile(root_folder):
-        if _is_verilog(root_folder):
-            file_content: str = _read_file(root_folder)
-            if ".*" in file_content:
-                return [root_folder]
+    if os.path.isfile(root_path) and _is_verilog(root_path):
+        file_content: str = _read_file(root_path)
+        if ".*" in file_content:
+            return [root_path]
 
     wildcards: List[str] = []
 
     # Walk through the root folder and its subdirectories
-    for subdir, _, files in os.walk(root_folder):
+    for subdir, _, files in os.walk(root_path):
         for file in files:
             if _is_verilog(file):
                 file_path: str = os.path.join(subdir, file)
