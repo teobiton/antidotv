@@ -188,7 +188,7 @@ def cure_from_wildcards(
             file_content = replace_wildcards_with_signals(file_content, module, order)
 
     # Fix syntax errors if any
-    for match in re.finditer(r",\n(\s+)\)\;", file_content, re.MULTILINE):
+    for match in re.finditer(r",\n(?:.|\s*)^( +)\)\;", file_content, re.MULTILINE):
         _tabs: str = len(match.group(1)) * " "
         file_content = file_content.replace(match.group(0), f"\n{_tabs});")
 
