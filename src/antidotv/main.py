@@ -123,7 +123,7 @@ def find_sv_modules(root_folder: str) -> Dict[str, List[Module]]:
                         file_modules.append(
                             Module(name=match.group(1), inouts=_parse_inouts(module))
                         )
-            sv_modules[file_path] = file_modules
+                sv_modules[file_path] = file_modules
 
     return sv_modules
 
